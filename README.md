@@ -61,12 +61,25 @@ daemon, so there is no further prompt.
 - The daemon binary is installed root-owned (`root:wheel`, `755`) and is not
   writable by regular users.
 
-Residual consideration: any admin-group process on the machine can ask the
-daemon to reset the default route to Wi-Fi and add tunnel routes. For a routing
-convenience utility that is acceptable, but if you distribute this beyond your
-own machines you should run it past whoever owns endpoint/security policy — a
-root daemon that changes networking is exactly the kind of thing change
-management cares about.
+### Security & deployment (read before distributing)
+
+This tool is designed for **individual, personal use on your own Mac**. Before
+you deploy it to anyone else's machine, understand what it entails:
+
+- **It installs a root LaunchDaemon that changes system networking.** Any
+  admin-group process on the machine can drive it (reset the default route to
+  Wi-Fi, add tunnel routes). That is acceptable for a personal routing utility;
+  it is *not* automatically acceptable on managed/corporate endpoints.
+- **The build is unsigned** (ad-hoc signature, not notarized). It will trip
+  Gatekeeper, and it is not suitable for MDM/managed distribution without a
+  proper Developer ID signature and notarization.
+- **No warranty.** Provided as-is under the MIT license.
+
+> If you are on a managed or corporate machine, get sign-off from whoever owns
+> endpoint / security / change-management policy first. A root daemon that
+> alters networking and overrides VPN routing is exactly the kind of change
+> those teams need to review — installing it yourself may violate device or
+> acceptable-use policy. When in doubt, ask before installing.
 
 ## Build
 
