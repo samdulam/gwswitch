@@ -1,0 +1,44 @@
+#!/bin/bash
+# Runs as root during .pkg install. Sets ownership/permissions and (re)loads the
+# gatewayd LaunchDaemon so route changes work without any further password prompt.
+set -e
+
+DAEMON_BIN="/usr/local/libexec/gatewayd"
+PLIST="/Library/LaunchDaemons/com.gatewaytray.daemon.plist"
+AGENT="/Library/LaunchAgents/com.gatewaytray.app.plist"
+LABEL="com.gatewaytray.daemon"
+AGENT_LABEL="com.gatewaytray.app"
+LOG="/var/log/gatewaytray.log"
+
+# Lock down the privileged binary: root-owned, not writable by regular users.
+chown root:wheel "$DAEMON_BIN"
+chmod 755 "$DAEMON_BIN"
+chown root:wheel "$PLIST"
+chmod 644 "$PLIST"
+chown root:wheel "$AGENT"
+chmod 644 "$AGENT"
+
+touch "$LOG"
+chown root:admin "$LOG"
+chmod 664 "$LOG"
+
+# Reload the daemon (bootout first in case of an upgrade over a running instance).
+launchctl bootout system "$PLIST" 2>/dev/null || true
+launchctl bootstrap system "$PLIST"
+launchctl enable "system/$LABEL"
+launchctl kickstart -k "system/$LABEL" 2>/dev/null || true
+
+# Auto-start the menu-bar app for the logged-in user now, and at every login.
+# (The agent in /Library/LaunchAgents loads automatically for other users on
+#  their next login.)
+CONSOLE_USER=$(stat -f %Su /dev/console 2>/dev/null || true)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+  CONSOLE_UID=$(id -u "$CONSOLE_USER" 2>/dev/null || true)
+  if [ -n "$CONSOLE_UID" ]; then
+    launchctl bootout "gui/$CONSOLE_UID/$AGENT_LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$CONSOLE_UID" "$AGENT" 2>/dev/null || true
+    launchctl enable "gui/$CONSOLE_UID/$AGENT_LABEL" 2>/dev/null || true
+  fi
+fi
+
+exit 0

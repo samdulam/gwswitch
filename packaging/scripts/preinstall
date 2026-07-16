@@ -1,0 +1,29 @@
+#!/bin/bash
+# Runs as root before payload is written. Stops any running instance so files can
+# be replaced cleanly on upgrade.
+set -e
+
+PLIST="/Library/LaunchDaemons/com.gatewaytray.daemon.plist"
+AGENT_LABEL="com.gatewaytray.app"
+
+launchctl bootout system "$PLIST" 2>/dev/null || true
+
+# Stop the running menu-bar app (login-agent instance and any manual one), under
+# both the current name and the previous "GatewayTray" name.
+CONSOLE_USER=$(stat -f %Su /dev/console 2>/dev/null || true)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+  CONSOLE_UID=$(id -u "$CONSOLE_USER" 2>/dev/null || true)
+  [ -n "$CONSOLE_UID" ] && launchctl bootout "gui/$CONSOLE_UID/$AGENT_LABEL" 2>/dev/null || true
+fi
+pkill -x GWSwitch 2>/dev/null || true
+pkill -x GatewayTray 2>/dev/null || true
+
+# Migrate from the old app name: remove the previous bundle and unregister it so
+# it doesn't linger as a duplicate in the Applications list.
+LSREG="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -d /Applications/GatewayTray.app ]; then
+  [ -x "$LSREG" ] && "$LSREG" -u /Applications/GatewayTray.app 2>/dev/null || true
+  rm -rf /Applications/GatewayTray.app
+fi
+
+exit 0
