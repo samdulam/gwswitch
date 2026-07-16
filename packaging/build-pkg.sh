@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."   # project root
 BUILD="dist/build"
 APP="$BUILD/GWSwitch.app"
 DAEMON="$BUILD/libexec/gatewayd"
-VERSION="1.0.1"
+VERSION="1.0.2"
 IDENTIFIER="com.gatewaytray.pkg"
 COMPONENT="dist/GWSwitch-component.pkg"
 OUT="dist/GWSwitch-${VERSION}.pkg"

@@ -105,18 +105,40 @@ func activeDefaultInterface() -> String {
     return ""
 }
 
-/// Gateway IP for the Wi-Fi interface. Prefers the interface's own default
-/// route, then falls back to its DHCP-provided router — the latter still works
-/// when Wi-Fi has an address but does not currently own a default route (e.g.
-/// right after wake from sleep, or while the VPN tunnel holds the default).
+/// Gateway IP for the Wi-Fi interface, tried three independent ways so it works
+/// even when the interface isn't the current default route (e.g. while the VPN
+/// tunnel holds the default): its own default route, its DHCP-provided router,
+/// then its interface-scoped default route.
 func wifiGateway(_ wifiIf: String) -> String? {
     if let gw = defaultRoutes().first(where: { $0.iface == wifiIf })?.gateway {
         return gw
     }
-    let (status, out) = run("/usr/sbin/ipconfig", ["getoption", wifiIf, "router"])
-    let gw = out.trimmingCharacters(in: .whitespacesAndNewlines)
-    if status == 0, !gw.isEmpty, gw != "0.0.0.0" {
-        return gw
+    let (st1, out1) = run("/usr/sbin/ipconfig", ["getoption", wifiIf, "router"])
+    let dhcp = out1.trimmingCharacters(in: .whitespacesAndNewlines)
+    if st1 == 0, !dhcp.isEmpty, dhcp != "0.0.0.0" {
+        return dhcp
+    }
+    let (_, out2) = run("/sbin/route", ["-n", "get", "-ifscope", wifiIf, "default"])
+    for line in out2.components(separatedBy: "\n") {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("gateway:") {
+            let gw = t.replacingOccurrences(of: "gateway:", with: "").trimmingCharacters(in: .whitespaces)
+            if !gw.isEmpty { return gw }
+        }
+    }
+    return nil
+}
+
+/// Like wifiGateway, but waits up to `timeout` seconds for the gateway to appear.
+/// Right after wake from sleep, Wi-Fi has usually re-associated but hasn't yet
+/// renewed DHCP or reinstalled a route, so the gateway is briefly undetectable
+/// by any method; polling smooths over that window instead of failing outright.
+func waitForWifiGateway(_ wifiIf: String, timeout: Double) -> String? {
+    if let gw = wifiGateway(wifiIf) { return gw }
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        Thread.sleep(forTimeInterval: 0.75)
+        if let gw = wifiGateway(wifiIf) { return gw }
     }
     return nil
 }
@@ -186,7 +208,9 @@ func applyRoutes(_ networks: [String]) -> [String: Any] {
     }
 
     let wifi = wifiInterface()
-    guard let gw = wifiGateway(wifi) else {
+    // Wait briefly: right after wake from sleep the gateway can be momentarily
+    // undetectable while Wi-Fi finishes reconnecting.
+    guard let gw = waitForWifiGateway(wifi, timeout: 8.0) else {
         return ["ok": false, "error": "could not determine Wi-Fi (\(wifi)) gateway — is Wi-Fi connected?"]
     }
     let tunnel = tunnelInterface(wifi)
