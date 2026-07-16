@@ -105,9 +105,20 @@ func activeDefaultInterface() -> String {
     return ""
 }
 
-/// Gateway IP for the Wi-Fi interface's default route.
+/// Gateway IP for the Wi-Fi interface. Prefers the interface's own default
+/// route, then falls back to its DHCP-provided router — the latter still works
+/// when Wi-Fi has an address but does not currently own a default route (e.g.
+/// right after wake from sleep, or while the VPN tunnel holds the default).
 func wifiGateway(_ wifiIf: String) -> String? {
-    return defaultRoutes().first(where: { $0.iface == wifiIf })?.gateway
+    if let gw = defaultRoutes().first(where: { $0.iface == wifiIf })?.gateway {
+        return gw
+    }
+    let (status, out) = run("/usr/sbin/ipconfig", ["getoption", wifiIf, "router"])
+    let gw = out.trimmingCharacters(in: .whitespacesAndNewlines)
+    if status == 0, !gw.isEmpty, gw != "0.0.0.0" {
+        return gw
+    }
+    return nil
 }
 
 /// The single active default route's gateway and interface (from `route get default`).
