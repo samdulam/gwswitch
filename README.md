@@ -71,6 +71,8 @@ management cares about.
 ## Build
 
 Requires Xcode Command Line Tools (`xcode-select --install`). No other deps.
+Produces a **universal** (arm64 + x86_64) build; runs on macOS 11+ (Apple
+Silicon and Intel).
 
 ```bash
 ./build.sh                 # compiles gatewayd + GWSwitch.app into dist/build/
