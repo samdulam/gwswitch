@@ -18,5 +18,10 @@
     <string>/var/log/gatewaytray.log</string>
     <key>ProcessType</key>
     <string>Background</string>
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
 </dict>
 </plist>

@@ -51,12 +51,21 @@ func run(_ path: String, _ args: [String]) -> (status: Int32, output: String) {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: path)
     p.arguments = args
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = pipe
+    let outPipe = Pipe()
+    let errPipe = Pipe()
+    p.standardOutput = outPipe
+    p.standardError = errPipe
     do { try p.run() } catch { return (-1, "") }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let readHandle = outPipe.fileHandleForReading
+    let data = readHandle.readDataToEndOfFile()
     p.waitUntilExit()
+    // Explicitly close every pipe end. In a long-running daemon, relying on
+    // deallocation to close these leaks file descriptors over time; once the
+    // process hits its fd limit, all further subprocess calls return empty.
+    try? readHandle.close()
+    try? outPipe.fileHandleForWriting.close()
+    try? errPipe.fileHandleForReading.close()
+    try? errPipe.fileHandleForWriting.close()
     return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
 }
 

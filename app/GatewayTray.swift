@@ -103,6 +103,28 @@ func activeDefaultInterface() -> String {
     return ""
 }
 
+/// Wi-Fi interface (e.g. "en0"), detected locally via networksetup; falls back
+/// to en0. Cached by the caller — this is not on the periodic path.
+func wifiInterfaceLocal() -> String {
+    let p = Process()
+    p.launchPath = "/usr/sbin/networksetup"
+    p.arguments = ["-listallhardwareports"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    p.standardError = Pipe()
+    do { try p.run() } catch { return "en0" }
+    let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    p.waitUntilExit()
+    let lines = out.components(separatedBy: "\n")
+    for (i, line) in lines.enumerated() where line.contains("Wi-Fi") || line.contains("AirPort") {
+        if i + 1 < lines.count {
+            let dev = lines[i + 1].replacingOccurrences(of: "Device:", with: "").trimmingCharacters(in: .whitespaces)
+            if !dev.isEmpty { return dev }
+        }
+    }
+    return "en0"
+}
+
 func routingTableText() -> String {
     let p = Process()
     p.launchPath = "/usr/sbin/netstat"
@@ -279,6 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
     var isWifi = false
     var currentInterface = ""
+    var wifiIface = "en0"
     var windowController: GatewayWindowController?
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -288,6 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(statusClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        wifiIface = wifiInterfaceLocal()
         update()
         timer = Timer.scheduledTimer(withTimeInterval: POLL_INTERVAL, repeats: true) { [weak self] _ in
             self?.update()
@@ -296,9 +320,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func update() {
         currentInterface = activeDefaultInterface()
-        // Trust the daemon's Wi-Fi detection when reachable; fall back to en0.
-        let wifi = (sendToDaemon(["cmd": "status"])?.dict["wifi"] as? String) ?? "en0"
-        isWifi = (currentInterface == wifi)
+        // Compare against the locally-detected, cached Wi-Fi interface. This runs
+        // every few seconds, so it must NOT call the daemon — doing so made the
+        // daemon spawn subprocesses on every tick and eventually exhaust its file
+        // descriptors, after which detection failed entirely.
+        isWifi = (currentInterface == wifiIface)
         guard let button = statusItem.button else { return }
         button.title = isWifi ? "🟢" : "🟠"
         let desc = currentInterface.isEmpty ? "unknown" : currentInterface
