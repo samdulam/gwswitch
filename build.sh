@@ -41,8 +41,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key>              <string>GW Switch</string>
     <key>CFBundleDisplayName</key>       <string>GW Switch</string>
     <key>CFBundleIdentifier</key>        <string>com.gatewaytray</string>
-    <key>CFBundleVersion</key>           <string>1.0.3</string>
-    <key>CFBundleShortVersionString</key><string>1.0.3</string>
+    <key>CFBundleVersion</key>           <string>1.0.4</string>
+    <key>CFBundleShortVersionString</key><string>1.0.4</string>
     <key>CFBundlePackageType</key>       <string>APPL</string>
     <key>CFBundleExecutable</key>        <string>GWSwitch</string>
     <key>CFBundleIconFile</key>          <string>AppIcon</string>

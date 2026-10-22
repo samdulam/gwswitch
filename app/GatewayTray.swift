@@ -29,6 +29,11 @@ let DEFAULT_CONFIG = """
 # 20.190.0.0/16
 # 40.126.0.0/16
 
+# GitHub Enterprise
+48.214.149.97/32
+74.249.180.193/32
+172.202.123.177/32
+
 # Add your own tunnel networks here, one CIDR per line.
 """
 
@@ -311,11 +316,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(statusClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        installEditMenu()
         wifiIface = wifiInterfaceLocal()
         update()
         timer = Timer.scheduledTimer(withTimeInterval: POLL_INTERVAL, repeats: true) { [weak self] _ in
             self?.update()
         }
+    }
+
+    /// An accessory app has no main menu, so Cmd+C/V/X/A/Z would never reach the
+    /// text views. Install a minimal Edit menu so the standard shortcuts work.
+    func installEditMenu() {
+        let mainMenu = NSMenu()
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(redo)
+        edit.addItem(.separator())
+        edit.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        edit.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        edit.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editItem.submenu = edit
+        NSApp.mainMenu = mainMenu
     }
 
     func update() {
